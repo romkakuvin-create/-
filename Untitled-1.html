@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body { background: #1a1a1a; color: white; text-align: center; font-family: sans-serif; }
+        .wheel-container { position: relative; margin: 20px auto; width: 300px; }
+        img.prize-icon { width: 50px; position: absolute; } /* Тут будут твои картинки */
+        #spin-btn { padding: 15px 30px; font-size: 18px; background: #0088cc; border: none; color: white; border-radius: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Рулетка Подарков</h1>
+    <div class="wheel-container">
+        <canvas id="wheel" width="300" height="300"></canvas>
+    </div>
+    <button id="spin-btn" onclick="startSpin()">КРУТИТЬ</button>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand(); // Развернуть на весь экран
+
+        function startSpin() {
+            // Логика вращения...
+            setTimeout(() => {
+                alert("Вы выиграли NFT!");
+                // Можно отправить данные обратно боту
+                // tg.sendData("win_nft_common"); 
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
