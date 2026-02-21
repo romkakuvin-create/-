@@ -1,34 +1,230 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Premium Roulette</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <style>
-        body { background: #1a1a1a; color: white; text-align: center; font-family: sans-serif; }
-        .wheel-container { position: relative; margin: 20px auto; width: 300px; }
-        img.prize-icon { width: 50px; position: absolute; } /* Тут будут твои картинки */
-        #spin-btn { padding: 15px 30px; font-size: 18px; background: #0088cc; border: none; color: white; border-radius: 10px; }
+        :root {
+            --tg-theme-bg-color: #0f172a;
+            --accent-color: #0088cc;
+            --neon-glow: 0 0 15px rgba(0, 136, 204, 0.8), 0 0 30px rgba(0, 136, 204, 0.4);
+        }
+
+        body {
+            background-color: var(--tg-theme-bg-color);
+            color: white;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        .main-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        /* Ободок рулетки с неоном */
+        .wheel-outer {
+            position: relative;
+            width: 340px;
+            height: 340px;
+            border-radius: 50%;
+            padding: 10px;
+            background: linear-gradient(145deg, #1e293b, #0f172a);
+            box-shadow: var(--neon-glow);
+            border: 4px solid #1e293b;
+        }
+
+        #canvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            transition: transform 5s cubic-bezier(0.15, 0, 0.15, 1);
+        }
+
+        /* Центральная кнопка/лого */
+        .wheel-center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 60px;
+            height: 60px;
+            background: white;
+            border-radius: 50%;
+            z-index: 5;
+            box-shadow: 0 0 20px rgba(255,255,255,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .wheel-center img {
+            width: 40px;
+        }
+
+        /* Стрелка сверху */
+        .pointer {
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 40px;
+            z-index: 10;
+            filter: drop-shadow(0 5px 10px rgba(0,0,0,0.5));
+        }
+
+        #spin-btn {
+            background: linear-gradient(135deg, #0088cc, #004466);
+            color: white;
+            border: none;
+            padding: 18px 60px;
+            font-size: 22px;
+            font-weight: bold;
+            border-radius: 15px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        #spin-btn:active {
+            transform: scale(0.95);
+        }
+
+        #spin-btn:disabled {
+            background: #334155;
+            box-shadow: none;
+        }
+
+        .balance-info {
+            font-size: 18px;
+            background: rgba(255,255,255,0.1);
+            padding: 8px 20px;
+            border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
     </style>
 </head>
 <body>
-    <h1>Рулетка Подарков</h1>
-    <div class="wheel-container">
-        <canvas id="wheel" width="300" height="300"></canvas>
+
+    <div class="main-container">
+        <div class="balance-info">⭐️ Баланс: <span id="balance">0</span></div>
+
+        <div class="wheel-outer">
+            <svg class="pointer" viewBox="0 0 50 50">
+                <path d="M25 50 L50 0 L0 0 Z" fill="#ff4757" stroke="white" stroke-width="2"/>
+            </svg>
+            
+            <div class="wheel-center">
+                <img src="https://telegram.org/img/t_logo.png" alt="TG">
+            </div>
+
+            <canvas id="canvas" width="600" height="600"></canvas>
+        </div>
+
+        <button id="spin-btn">Крутить 🎰</button>
     </div>
-    <button id="spin-btn" onclick="startSpin()">КРУТИТЬ</button>
 
     <script>
         const tg = window.Telegram.WebApp;
-        tg.expand(); // Развернуть на весь экран
+        tg.expand();
+        tg.enableClosingConfirmation();
 
-        function startSpin() {
-            // Логика вращения...
-            setTimeout(() => {
-                alert("Вы выиграли NFT!");
-                // Можно отправить данные обратно боту
-                // tg.sendData("win_nft_common"); 
-            }, 3000);
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const btn = document.getElementById('spin-btn');
+        const balanceEl = document.getElementById('balance');
+
+        // Конфигурация призов
+        const prizes = [
+            { name: 'Common NFT', color: '#1e293b', textColor: '#38bdf8' },
+            { name: 'TG Premium', color: '#312e81', textColor: '#a78bfa' },
+            { name: '100 Stars', color: '#422006', textColor: '#fbbf24' },
+            { name: 'Rare NFT', color: '#14532d', textColor: '#4ade80' },
+            { name: 'Nothing', color: '#0f172a', textColor: '#94a3b8' },
+            { name: 'Jackpot', color: '#701a75', textColor: '#f472b6' }
+        ];
+
+        let currentRotation = 0;
+        const numSegments = prizes.length;
+        const segmentAngle = (2 * Math.PI) / numSegments;
+
+        function drawWheel() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let i = 0; i < numSegments; i++) {
+                const angle = i * segmentAngle;
+                
+                // Рисуем сектор
+                ctx.beginPath();
+                ctx.fillStyle = prizes[i].color;
+                ctx.moveTo(300, 300);
+                ctx.arc(300, 300, 300, angle, angle + segmentAngle);
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Рисуем текст
+                ctx.save();
+                ctx.translate(300, 300);
+                ctx.rotate(angle + segmentAngle / 2);
+                ctx.textAlign = "right";
+                ctx.fillStyle = prizes[i].textColor;
+                ctx.font = "bold 24px Arial";
+                ctx.fillText(prizes[i].name, 280, 10);
+                ctx.restore();
+            }
         }
+
+        function spin() {
+            btn.disabled = true;
+            const rounds = 7 + Math.floor(Math.random() * 5); // Количество полных оборотов
+            const randomAngle = Math.floor(Math.random() * 360);
+            currentRotation += (rounds * 360) + randomAngle;
+
+            canvas.style.transform = `rotate(${currentRotation}deg)`;
+
+            setTimeout(() => {
+                btn.disabled = false;
+                confetti({
+                    particleCount: 150,
+                    spread: 70,
+                    origin: { y: 0.6 },
+                    colors: ['#0088cc', '#ffffff', '#ff4757']
+                });
+                
+                // Рассчитываем какой сектор выпал
+                const actualDeg = currentRotation % 360;
+                const prizeIndex = Math.floor((360 - actualDeg) / (360 / numSegments)) % numSegments;
+                const winner = prizes[prizeIndex];
+
+                tg.showPopup({
+                    title: '🎉 Выигрыш!',
+                    message: `Ты выиграл: ${winner.name}`,
+                    buttons: [{type: 'ok'}]
+                });
+
+                // Шлем данные боту о выигрыше
+                tg.sendData(JSON.stringify({prize: winner.name}));
+                
+            }, 5000);
+        }
+
+        btn.addEventListener('click', spin);
+        drawWheel();
+
     </script>
 </body>
-
 </html>
