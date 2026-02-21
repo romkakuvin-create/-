@@ -33,7 +33,6 @@
             gap: 20px;
         }
 
-        /* Ободок рулетки с неоном */
         .wheel-outer {
             position: relative;
             width: 340px;
@@ -52,7 +51,6 @@
             transition: transform 5s cubic-bezier(0.15, 0, 0.15, 1);
         }
 
-        /* Центральная кнопка/лого */
         .wheel-center {
             position: absolute;
             top: 50%;
@@ -73,7 +71,6 @@
             width: 40px;
         }
 
-        /* Стрелка сверху */
         .pointer {
             position: absolute;
             top: -15px;
@@ -114,13 +111,14 @@
             padding: 8px 20px;
             border-radius: 20px;
             border: 1px solid rgba(255,255,255,0.2);
+            box-shadow: 0 0 5px rgba(0,136,204,0.5);
         }
     </style>
 </head>
 <body>
 
     <div class="main-container">
-        <div class="balance-info">⭐️ Баланс: <span id="balance">0</span></div>
+        <div class="balance-info">⭐️ Твои попытки: <span id="balance">0</span></div>
 
         <div class="wheel-outer">
             <svg class="pointer" viewBox="0 0 50 50">
@@ -147,19 +145,38 @@
         const btn = document.getElementById('spin-btn');
         const balanceEl = document.getElementById('balance');
 
-        // Конфигурация призов
+        // --- КОНФИГУРАЦИЯ ПРИЗОВ С КАРТИНКАМИ ---
         const prizes = [
-            { name: 'Common NFT', color: '#1e293b', textColor: '#38bdf8' },
-            { name: 'TG Premium', color: '#312e81', textColor: '#a78bfa' },
-            { name: '100 Stars', color: '#422006', textColor: '#fbbf24' },
-            { name: 'Rare NFT', color: '#14532d', textColor: '#4ade80' },
-            { name: 'Nothing', color: '#0f172a', textColor: '#94a3b8' },
-            { name: 'Jackpot', color: '#701a75', textColor: '#f472b6' }
+            { name: 'Common NFT', color: '#1e293b', textColor: '#38bdf8', img: 'https://img.icons8.com/plasticine/100/nft.png' },
+            { name: 'TG Premium', color: '#312e81', textColor: '#a78bfa', img: 'https://img.icons8.com/arcade/100/telegram-app.png' },
+            { name: '100 Stars', color: '#422006', textColor: '#fbbf24', img: 'https://img.icons8.com/stickers/100/star.png' },
+            { name: 'Rare NFT', color: '#14532d', textColor: '#4ade80', img: 'https://img.icons8.com/fluency/100/collectible.png' },
+            { name: 'No Luck', color: '#0f172a', textColor: '#94a3b8', img: 'https://img.icons8.com/ios/100/cross.png' },
+            { name: 'Big Bonus', color: '#701a75', textColor: '#f472b6', img: 'https://img.icons8.com/plasticine/100/prize.png' }
         ];
+        // --- КОНЕЦ КОНФИГУРАЦИИ ---
+
 
         let currentRotation = 0;
         const numSegments = prizes.length;
         const segmentAngle = (2 * Math.PI) / numSegments;
+        const prizeImages = [];
+        let imagesLoaded = 0;
+
+        // Загружаем все изображения призов
+        function loadImages(callback) {
+            prizes.forEach((prize, index) => {
+                const img = new Image();
+                img.src = prize.img;
+                img.onload = () => {
+                    prizeImages[index] = img;
+                    imagesLoaded++;
+                    if (imagesLoaded === numSegments) {
+                        callback();
+                    }
+                };
+            });
+        }
 
         function drawWheel() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -176,21 +193,36 @@
                 ctx.lineWidth = 2;
                 ctx.stroke();
 
-                // Рисуем текст
                 ctx.save();
                 ctx.translate(300, 300);
                 ctx.rotate(angle + segmentAngle / 2);
                 ctx.textAlign = "right";
                 ctx.fillStyle = prizes[i].textColor;
                 ctx.font = "bold 24px Arial";
-                ctx.fillText(prizes[i].name, 280, 10);
+
+                // Рисуем картинку
+                if (prizeImages[i]) {
+                    const img = prizeImages[i];
+                    const imgSize = 70; // Размер иконки
+                    const imgX = 280 - imgSize - 10; // Смещение для картинки
+                    const imgY = -imgSize / 2; // Центрируем по вертикали
+                    ctx.drawImage(img, imgX, imgY, imgSize, imgSize);
+                }
+
+                // Рисуем текст (немного ниже картинки)
+                ctx.fillText(prizes[i].name, 280, 20);
                 ctx.restore();
             }
         }
 
         function spin() {
+            // Здесь должна быть проверка баланса
+            // Если баланс > 0:
+            //   tg.sendData(JSON.stringify({action: 'deduct_spin'})); // Отправляем боту запрос на списание
+            // ИЛИ просто уменьшаем balanceEl.textContent
+
             btn.disabled = true;
-            const rounds = 7 + Math.floor(Math.random() * 5); // Количество полных оборотов
+            const rounds = 7 + Math.floor(Math.random() * 5); 
             const randomAngle = Math.floor(Math.random() * 360);
             currentRotation += (rounds * 360) + randomAngle;
 
@@ -205,9 +237,9 @@
                     colors: ['#0088cc', '#ffffff', '#ff4757']
                 });
                 
-                // Рассчитываем какой сектор выпал
                 const actualDeg = currentRotation % 360;
-                const prizeIndex = Math.floor((360 - actualDeg) / (360 / numSegments)) % numSegments;
+                const normalizedDeg = (360 - actualDeg + 360) % 360; // Учитываем вращение
+                const prizeIndex = Math.floor(normalizedDeg / (360 / numSegments));
                 const winner = prizes[prizeIndex];
 
                 tg.showPopup({
@@ -216,14 +248,36 @@
                     buttons: [{type: 'ok'}]
                 });
 
-                // Шлем данные боту о выигрыше
-                tg.sendData(JSON.stringify({prize: winner.name}));
+                // Отправляем боту данные о выигрыше
+                tg.sendData(JSON.stringify({prize: winner.name, user_id: tg.initDataUnsafe.user.id}));
                 
-            }, 5000);
+            }, 5000); // 5 секунд анимация
         }
 
+        // Обновляем баланс при старте Web App
+        tg.onEvent('main_button_pressed', () => {
+            // Эта функция вызывается, когда Web App открывается
+            // Здесь нужно получить баланс от бота
+            // tg.sendData(JSON.stringify({action: 'get_balance', user_id: tg.initDataUnsafe.user.id}));
+        });
+        
+        // Mock-функция для обновления баланса (для примера)
+        function updateBalance(newBalance) {
+            balanceEl.textContent = newBalance;
+        }
+        updateBalance(0); // Изначально 0
+
         btn.addEventListener('click', spin);
-        drawWheel();
+
+        // Загружаем картинки и только потом рисуем колесо
+        loadImages(drawWheel);
+
+        // Слушаем данные от бота (если бот будет присылать баланс)
+        tg.onEvent('message_from_bot', (event) => {
+            if (event.data && event.data.balance) {
+                updateBalance(event.data.balance);
+            }
+        });
 
     </script>
 </body>
